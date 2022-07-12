@@ -63,7 +63,10 @@ export default {
     description: 'Opis',
     remove_payment_history: 'Usuń historię płatności',
     new_page: 'Nowa strona',
-    go_back: 'Cofnij się'
+    go_back: 'Cofnij się',
+    generate_new_key: 'Wygeneruj nowy klucz',
+    send_test_message: 'Wyślij testową wiadomość',
+    reset_stack: 'Zresetuj stos komend'
   },
 
   fields: {
@@ -130,7 +133,8 @@ export default {
     gid: 'ID Google analytics',
     module_enabled: 'Moduł włączony',
     choose_payment_method: 'Wybierz sposób płatności',
-    commands_in_queue: 'Komendy w kolejce'
+    commands_in_queue: 'Komendy w kolejce',
+    plugin_secret: 'Klucz do pluginu'
   },
 
   formats: {
@@ -200,7 +204,8 @@ export default {
     buy_service_3: 'Potwierdzenie',
     buy_service_4: 'Realizacja',
     main_page: 'Strona główna',
-    modules: 'Moduły'
+    modules: 'Moduły',
+    voucher_success: 'Pomyślnie użyto vouchera'
   },
 
   responses: {

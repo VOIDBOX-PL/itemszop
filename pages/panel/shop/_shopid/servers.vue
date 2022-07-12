@@ -27,35 +27,22 @@
         </v-toolbar>
       </template>
       <template #[`item.actions`]="{ item }">
-        <v-icon
-          class="mr-2"
-          @click="applyServer(item);dialog=true"
-        >
-          mdi-pencil
-        </v-icon>
-        <v-icon
-          class="mr-2"
-          @click="sendTest(item)"
-        >
-          mdi-test-tube
-        </v-icon>
-        <v-icon
-          class="mr-2"
-          @click="clearCommands(item)"
-        >
-          mdi-autorenew-off
-        </v-icon>
-        <v-icon
-          class="mr-2"
-          @click="dialogDelete=true;currentItem=item"
-        >
-          mdi-delete
-        </v-icon>
+        <v-btn color="primary" @click="applyServer(item);dialog=true;currentItem=item">
+          <v-icon>
+            mdi-pencil
+          </v-icon>
+        </v-btn>
+        <v-btn color="error" @click="dialogDelete=true;currentItem=item">
+          <v-icon>
+            mdi-delete
+          </v-icon>
+        </v-btn>
       </template>
     </v-data-table>
     <v-dialog
       v-model="dialog"
       max-width="500"
+      persistent
     >
       <v-card tile flat outlined>
         <v-card-title class="text-h5">
@@ -78,11 +65,6 @@
               :rules="rules.server_id"
               autocomplete="new-password"
             />
-            <v-text-field
-              v-model="triggerIp"
-              :label="$t('fields.trigger_ip')"
-              autocomplete="new-password"
-            />
             <v-alert
               v-model="error"
               color="red"
@@ -92,19 +74,37 @@
             >
               {{ $t('responses.server_already_exist') }}
             </v-alert>
+            <template v-if="serverAlreadyExists">
+              <v-text-field
+                v-model="pluginKey"
+                class="mt-5"
+                :label="$t('fields.plugin_secret')"
+                readonly
+              />
+
+              <v-btn color="primary" outlined block @click="regeneratePluginSecret(currentItem)">
+                {{ $t("actions.generate_new_key") }}
+              </v-btn>
+              <v-btn color="accent" class="mt-5" block @click="sendTest(currentItem)">
+                {{ $t("actions.send_test_message") }}
+              </v-btn>
+              <v-btn color="primary" class="mt-1" block @click="clearCommands(currentItem)">
+                {{ $t("actions.reset_stack") }}
+              </v-btn>
+            </template>
           </v-form>
         </v-card-text>
         <v-card-actions>
           <v-spacer />
           <v-btn
-            color="primary"
+            color="accent"
             text
             @click="dialog = false"
           >
             {{ $t('actions.cancel') }}
           </v-btn>
           <v-btn
-            color="success"
+            color="primary"
             text
             @click="saveServer"
           >
@@ -168,11 +168,6 @@ export default {
           value: 'serverId'
         },
         {
-          text: this.$t('fields.trigger_ip'),
-          align: 'start',
-          value: 'triggerIp'
-        },
-        {
           text: this.$t('fields.commands_in_queue'),
           align: 'start',
           value: 'commandsInQueue'
@@ -189,7 +184,6 @@ export default {
       valid: false,
       serverName: '',
       serverId: '',
-      triggerIp: '',
       oldServerId: '',
       error: false,
       rules: {
@@ -209,14 +203,17 @@ export default {
     }
   },
   computed: {
+    serverAlreadyExists () {
+      return !!this.servers[this.serverId]
+    },
     serversList () {
       const result = []
       for (const serverId in this.servers) {
         if (this.servers[serverId]) {
           const server = Object.assign({}, this.servers[serverId])
           server.serverId = serverId
-          if (this.servers[serverId].commands) {
-            server.commandsInQueue = Object.keys(this.servers[serverId].commands).length
+          if (this.servers[serverId].commands && this.servers[serverId].commands[server.secret]) {
+            server.commandsInQueue = Object.keys(this.servers[serverId].commands[server.secret]).length
           } else {
             server.commandsInQueue = 0
           }
@@ -225,6 +222,13 @@ export default {
         }
       }
       return result
+    },
+    pluginKey () {
+      if (this.serverId && this.servers[this.serverId] && this.servers[this.serverId].secret) {
+        return btoa(`${this.servers[this.serverId].secret}@${WebSocket._firebaseWebsocketUrl}@${this.serverId}`)
+      } else {
+        return false
+      }
     }
   },
   methods: {
@@ -232,17 +236,15 @@ export default {
       this.serverId = server.serverId
       this.oldServerId = server.serverId
       this.serverName = server.serverName
-      this.triggerIp = server.triggerIp
     },
     saveServer () {
       this.$refs.form.validate()
       if (this.valid) {
         const { shopid } = this.$route.params
-        const { serverId, serverName, triggerIp } = this
-        this.$fire.database.ref().child(`servers/${serverId}`).set({
+        const { serverId, serverName } = this
+        this.$fire.database.ref().child(`servers/${serverId}`).update({
           owner: this.$fire.auth.currentUser.uid,
-          serverName,
-          triggerIp
+          serverName
         }).then(() => {
           this.$fire.database.ref().child(`shops/${shopid}/servers`).update({ [serverId]: true })
           if (this.serverId !== this.oldServerId) {
@@ -265,17 +267,25 @@ export default {
     },
     newServer () {
       this.serverName = 'A Minecraft Server'
-      this.serverId = `${Math.random().toString(36).replace('0.', '')}`
+      this.serverId = this.randomString()
       this.oldServerId = this.serverId
       this.dialog = true
     },
     sendTest (server) {
-      this.$fire.database.ref().child(`servers/${server.serverId}/commands`).update({
-        [Math.random().toString(36).replace('0.', '')]: 'say ItemSzop test'
+      this.$fire.database.ref().child(`servers/${server.serverId}/commands/${this.servers[server.serverId].secret}`).update({
+        [this.randomString()]: 'say ItemSzop test'
       })
     },
     clearCommands (server) {
       this.$fire.database.ref().child(`servers/${server.serverId}/commands`).remove()
+    },
+    regeneratePluginSecret (server) {
+      this.secret = this.randomString()
+      this.clearCommands(server)
+      this.$fire.database.ref().child(`servers/${server.serverId}/secret`).set(this.secret)
+    },
+    randomString () {
+      return Math.random().toString(36).replace('0.', '')
     }
   }
 }

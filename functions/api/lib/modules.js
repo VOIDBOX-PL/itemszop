@@ -8,7 +8,6 @@ let fetch
 function getBaseUrl (url) {
   const l = url.split('/')
   return `${l[0]}//${l[2]}`
-  // return 'https://6a00-79-191-58-129.ngrok.io'
 }
 
 exports.request = (handler) => {
@@ -442,15 +441,10 @@ exports.executeService = async ({type, firebase, serviceid, shopid, nick, valida
     for (let command of commands) {
       command = command.replace(/\[nick\]/g, nick)
       command = command.replace(/\[n\]/g, amount)
-      await firebase.push(`servers/${serverid}/commands`, command)
+      newCommands[(Math.random() + 1).toString(36).substring(2)] = command
     }
+    await firebase.update(`servers/${serverid}/commands/${server.secret}`, newCommands)
   }
-
-  // trigger http server
-  try {
-    const {triggerIp} = server
-    await fetch(triggerIp)
-  } catch (e) {}
 
   // send discord webhook
   try {

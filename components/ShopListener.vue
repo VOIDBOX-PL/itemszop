@@ -4,6 +4,17 @@
 <script>
 import { mapGetters } from 'vuex'
 
+let captured = false
+const WebSocketClone = WebSocket
+WebSocket = function (...data) {
+  if (!captured) {
+    WebSocket._firebaseWebsocketUrl = data[0]
+    captured = true
+  }
+
+  return new WebSocketClone(...data)
+}
+
 export default {
   name: 'ShopListener',
   props: {
@@ -95,7 +106,6 @@ export default {
             shop.loaded = true
             this.shop = shop
           } else if (this.loggedIn) {
-            // console.log('shop not exist', shopId)
             this.$router.push('/')
           } else {
             window.top.location.href = process.env.baseUrl
